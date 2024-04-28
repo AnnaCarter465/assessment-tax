@@ -1,1 +1,5 @@
 .idea
+coverage.out
+tmp/
+.env
+env.bat

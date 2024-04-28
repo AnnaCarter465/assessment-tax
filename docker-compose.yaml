@@ -1,9 +1,28 @@
+version: '3.2'
+
 services:
-  postgres:
+  ktaxes-db:
+    container_name: ktaxes-db
     image: postgres:16
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ktaxes
     ports:
       - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres # WARN: this is a secret value, shouldn't expose to public. But this is just an assginment for give you an example!
+      POSTGRES_PASSWORD: postgres # WARN: this is a secret value, shouldn't expose to public. But this is just an assginment for give you an example!
+      POSTGRES_DB: ktaxes
+    volumes:
+    - ./initialdata:/docker-entrypoint-initdb.d
+
+  # example 
+  ktaxes:
+    container_name: ktaxes-app
+    build: .
+    ports:
+      - '8080:8080'
+    depends_on:
+      - ktaxes-db
+    environment:
+      # WARN: this is a secret value, shouldn't expose to public. But this is just an assginment for give you an example!
+      DATABASE_URL: postgres://postgres:postgres@ktaxes-db:5432/ktaxes?sslmode=disable
+      PORT: 8080
+
