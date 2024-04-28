@@ -17,18 +17,19 @@ import (
 
 type (
 	TaxRequest struct {
-		TotalIncome float64     `json:"totalIncome" validate:"required,number"`
-		Wht         float64     `json:"wht" validate:"number"`
+		TotalIncome float64     `json:"totalIncome" validate:"required,number,gte=0"`
+		Wht         float64     `json:"wht" validate:"number,gte=0"`
 		Allowances  []Allowance `json:"allowances" validate:"required,dive,required"`
 	}
 
 	Allowance struct {
 		AllowanceType string  `json:"allowanceType" validate:"required,lowercase"`
-		Amount        float64 `json:"amount" validate:"number"`
+		Amount        float64 `json:"amount" validate:"number,gte=0"`
 	}
 
 	TaxResponse struct {
-		Tax float64 `json:"tax"`
+		Tax       float64 `json:"tax"`
+		TaxRefund float64 `json:"taxRefund"`
 	}
 
 	CustomValidator struct {
@@ -74,6 +75,10 @@ func main() {
 			return err
 		}
 
+		if req.TotalIncome < req.Wht {
+			return c.String(http.StatusBadRequest, "wht must less than total income")
+		}
+
 		defaultAllowances, err := db.FindAllDefaultAllowances(c.Request().Context())
 		if err != nil {
 			log.Println("Failed to find all allowed allownaces", err)
@@ -108,14 +113,16 @@ func main() {
 			},
 			DefaultAllowances: defaultAllowancesMap,
 			AllowedAllowances: allowedAllowancesMap,
-		}).SetIncome(req.TotalIncome)
+		}).SetIncome(req.TotalIncome).SetWht(req.Wht)
 
 		for _, a := range req.Allowances {
 			tx.AddAllowance(a.AllowanceType, a.Amount)
 		}
 
+		pay, refund := tx.CalculateTax()
 		return c.JSON(http.StatusOK, &TaxResponse{
-			Tax: tx.CalculateTax(),
+			Tax:       pay,
+			TaxRefund: refund,
 		})
 	})
 
@@ -124,7 +131,6 @@ func main() {
 			e.Logger.Fatal(err)
 		}
 	}()
-
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt)
 	<-shutdown
@@ -135,6 +141,7 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
+		log.Fatal(e.Start(":8000"))
 		e.Logger.Fatal(err)
 	}
 }
