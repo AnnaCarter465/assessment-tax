@@ -17,17 +17,17 @@ func NewDB(dbURL string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return &DB{sqlDB: db}, nil
 }
 
-func (db *DB) GetSQLDB() *sql.DB {
+func (db *DB) getSQLDB() *sql.DB {
 	return db.sqlDB
 }
 
 func (db *DB) FindAllDefaultAllowances(ctx context.Context) ([]DefaultAllowance, error) {
 	var results []DefaultAllowance
 
-	rows, err := db.GetSQLDB().QueryContext(
+	rows, err := db.getSQLDB().QueryContext(
 		ctx,
 		`
 			SELECT allowance_type, amount FROM default_allowances
@@ -56,10 +56,33 @@ func (db *DB) FindAllDefaultAllowances(ctx context.Context) ([]DefaultAllowance,
 	return results, nil
 }
 
+func (db *DB) UpdateAmountDefaultAllowances(ctx context.Context, allowanceType string, amount float64) (DefaultAllowance, error) {
+	var (
+		at string
+		am float64
+	)
+
+	err := db.getSQLDB().QueryRowContext(ctx,
+		`
+			UPDATE default_allowances
+			SET amount = $2
+			WHERE allowance_type = $1
+			RETURNING allowance_type, amount
+	   	`, allowanceType, amount).Scan(&at, &am)
+	if err != nil {
+		return DefaultAllowance{}, err
+	}
+
+	return DefaultAllowance{
+		AllowanceType: at,
+		Amount:        am,
+	}, nil
+}
+
 func (db *DB) FindAllAllowedAllowances(ctx context.Context) ([]AllowedAllowance, error) {
 	var results []AllowedAllowance
 
-	rows, err := db.GetSQLDB().QueryContext(
+	rows, err := db.getSQLDB().QueryContext(
 		ctx,
 		`
 		SELECT allowance_type, max_amount FROM allowed_allowances
