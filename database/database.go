@@ -56,6 +56,29 @@ func (db *DB) FindAllDefaultAllowances(ctx context.Context) ([]DefaultAllowance,
 	return results, nil
 }
 
+func (db *DB) UpdateAmountDefaultAllowances(ctx context.Context, allowanceType string, amount float64) (DefaultAllowance, error) {
+	var (
+		at string
+		am float64
+	)
+
+	err := db.GetSQLDB().QueryRowContext(ctx,
+		`
+			UPDATE default_allowances
+			SET amount = $2
+			WHERE allowance_type = $1
+			RETURNING allowance_type, amount
+	   	`, allowanceType, amount).Scan(&at, &am)
+	if err != nil {
+		return DefaultAllowance{}, err
+	}
+
+	return DefaultAllowance{
+		AllowanceType: at,
+		Amount:        am,
+	}, nil
+}
+
 func (db *DB) FindAllAllowedAllowances(ctx context.Context) ([]AllowedAllowance, error) {
 	var results []AllowedAllowance
 

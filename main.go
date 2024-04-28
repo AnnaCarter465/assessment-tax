@@ -13,6 +13,7 @@ import (
 	"github.com/AnnaCarter465/assessment-tax/tax"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type (
@@ -36,6 +37,14 @@ type (
 	TaxLevel struct {
 		Level string  `json:"level"`
 		Tax   float64 `json:"tax"`
+	}
+
+	ErrMsg struct {
+		Message string `json:"message"`
+	}
+
+	AdminTaxRequest struct {
+		Amount float64 `json:"amount" validate:"required,number,gte=0"`
 	}
 
 	CustomValidator struct {
@@ -142,6 +151,47 @@ func main() {
 			Tax:       summary.Tax,
 			TaxRefund: summary.Refund,
 			TaxLevel:  levels,
+		})
+	})
+
+	// admin -----------------------------------------------------------------------------
+	am := e.Group("/admin")
+	am.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+		if username == os.Getenv("ADMIN_USERNAME") && password == os.Getenv("ADMIN_PASSWORD") {
+			return true, nil
+		}
+		return false, nil
+	}))
+
+	am.POST("/deductions/personal", func(c echo.Context) error {
+		var req AdminTaxRequest
+
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, ErrMsg{
+				Message: "bad request",
+			})
+		}
+
+		if err = c.Validate(req); err != nil {
+			return err
+		}
+
+		if req.Amount < 10_000 || req.Amount > 100_000 {
+			return c.JSON(http.StatusBadRequest, ErrMsg{
+				Message: "invalid amount",
+			})
+		}
+
+		defaultAllowance, err := db.UpdateAmountDefaultAllowances(c.Request().Context(), "personal", req.Amount)
+		if err != nil {
+			log.Println(err)
+			return c.JSON(http.StatusInternalServerError, ErrMsg{
+				Message: "Failed to update personal amount",
+			})
+		}
+
+		return c.JSON(http.StatusOK, map[string]float64{
+			"personalDeduction": defaultAllowance.Amount,
 		})
 	})
 
