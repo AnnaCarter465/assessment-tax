@@ -3,6 +3,7 @@ package tax
 type Rate struct {
 	Percentage float64
 	Max        float64
+	Label      string
 }
 type Allowances map[string]float64
 
@@ -75,40 +76,93 @@ func (t *Tax) calculateTotalAllowance() float64 {
 	return totalAllowance
 }
 
-func (t *Tax) CalculateTax() (float64, float64) {
-	netIncome := t.income - t.calculateTotalAllowance()
+type TaxStatement struct {
+	Rate Rate
+	Tax  float64
+}
 
-	if netIncome <= 0 {
-		return 0, t.wht
-	}
+func (t *Tax) calculateTaxStatement(netIncome float64) []TaxStatement {
+	var ts []TaxStatement
 
-	var tax float64
+	var totalTax float64
 
 	remain := netIncome
 
 	for _, rate := range t.taxConf.Rates {
 
-		// highest stage
-		if netIncome <= rate.Max {
-			tax += remain * rate.Percentage
-			remain = 0
-			break
+		if remain <= 0 {
+			ts = append(ts, TaxStatement{
+				Rate: rate,
+				Tax:  0,
+			})
+
+			continue
 		}
 
-		// infinite stage
-		if rate.Max == -1 {
-			tax += remain * rate.Percentage
+		// highest stage or infinity stage
+		if netIncome <= rate.Max || rate.Max == -1 {
+			tax := remain * rate.Percentage
+			totalTax += tax
 			remain = 0
-			break
+
+			ts = append(ts, TaxStatement{
+				Rate: rate,
+				Tax:  tax,
+			})
+
+			continue
 		}
 
-		tax += rate.Max * rate.Percentage
+		tax := rate.Max * rate.Percentage
+
+		totalTax += tax
 		remain -= rate.Max
+
+		ts = append(ts, TaxStatement{
+			Rate: rate,
+			Tax:  tax,
+		})
 	}
 
-	// no need to pay tax, and get refund
-	if tax <= t.wht {
-		return 0, t.wht - tax
+	return ts
+}
+
+type TaxSummary struct {
+	TaxStatements []TaxStatement
+	Tax           float64
+	Refund        float64
+}
+
+func (t *Tax) CalculateTaxSummary() TaxSummary {
+	netIncome := t.income - t.calculateTotalAllowance()
+
+	if netIncome <= 0 {
+		return TaxSummary{
+			TaxStatements: nil,
+			Tax:           0,
+			Refund:        t.wht,
+		}
 	}
-	return tax - t.wht, 0
+
+	statements := t.calculateTaxStatement(netIncome)
+
+	var tax float64
+
+	for _, statement := range statements {
+		tax += statement.Tax
+	}
+
+	var refund float64
+	if tax <= t.wht {
+		refund = t.wht - tax
+		tax = 0
+	} else {
+		tax = tax - t.wht
+	}
+
+	return TaxSummary{
+		TaxStatements: statements,
+		Tax:           tax,
+		Refund:        refund,
+	}
 }

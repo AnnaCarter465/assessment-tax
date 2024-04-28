@@ -1,10 +1,11 @@
 package tax
 
 import (
+	"reflect"
 	"testing"
 )
 
-func TestCalculateTax2(t *testing.T) {
+func TestCalculateTax(t *testing.T) {
 	type TC struct {
 		name              string
 		allowedAllowances Allowances
@@ -13,6 +14,7 @@ func TestCalculateTax2(t *testing.T) {
 		wht               float64
 		expectedTax       float64
 		expectedRefund    float64
+		expectStatements  []TaxStatement
 	}
 
 	tcs := []TC{
@@ -24,6 +26,28 @@ func TestCalculateTax2(t *testing.T) {
 			wht:               0,
 			expectedTax:       29_000,
 			expectedRefund:    0,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  29_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
 		},
 		{
 			name:              "allowances from user that not in allowed allowances are not calculate",
@@ -33,6 +57,28 @@ func TestCalculateTax2(t *testing.T) {
 			wht:               0,
 			expectedTax:       29_000,
 			expectedRefund:    0,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  29_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
 		},
 		{
 			name:              "allowances from user that in default allowances are not calculate again",
@@ -42,6 +88,28 @@ func TestCalculateTax2(t *testing.T) {
 			wht:               0,
 			expectedTax:       29_000,
 			expectedRefund:    0,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  29_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
 		},
 		{
 			name:              "income 500,000 and wht 25,000", // exp02
@@ -51,15 +119,59 @@ func TestCalculateTax2(t *testing.T) {
 			wht:               25_000,
 			expectedTax:       4000,
 			expectedRefund:    0,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  29_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
 		},
 		{
-			name:              "income 500,000 and donation 200,000", // exp03
+			name:              "income 500,000 and donation 200,000", // exp03, exp04
 			allowedAllowances: Allowances{"donation": 100_000, "k-receipt": 50_000},
 			income:            500_000,
 			allowances:        Allowances{"donation": 200_000},
 			wht:               0,
 			expectedTax:       19_000,
 			expectedRefund:    0,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  19_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
 		},
 	}
 
@@ -88,14 +200,18 @@ func TestCalculateTax2(t *testing.T) {
 				taxer.AddAllowance(allowanceType, allowanceAmount)
 			}
 
-			gotPay, gotRefund := taxer.CalculateTax()
+			got := taxer.CalculateTaxSummary()
 
-			if gotPay != tc.expectedTax {
-				t.Errorf("Wrong tax expected %v, but got %v", tc.expectedTax, gotPay)
+			if got.Tax != tc.expectedTax {
+				t.Errorf("Wrong tax expected %v, but got %v", tc.expectedTax, got.Tax)
 			}
 
-			if gotRefund != tc.expectedRefund {
-				t.Errorf("Wrong refund expected %v, but got %v", tc.expectedRefund, gotRefund)
+			if got.Refund != tc.expectedRefund {
+				t.Errorf("Wrong refund expected %v, but got %v", tc.expectedRefund, got.Refund)
+			}
+
+			if !reflect.DeepEqual(got.TaxStatements, tc.expectStatements) {
+				t.Errorf("Wrong tax statements expected %v, but got %v", tc.expectStatements, got.TaxStatements)
 			}
 		})
 	}
