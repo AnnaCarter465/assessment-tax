@@ -111,6 +111,29 @@ func (db *DB) FindAllAllowedAllowances(ctx context.Context) ([]AllowedAllowance,
 	return results, nil
 }
 
+func (db *DB) UpdateAmountAllowedAllowances(ctx context.Context, allowanceType string, amount float64) (AllowedAllowance, error) {
+	var (
+		at string
+		am float64
+	)
+
+	err := db.getSQLDB().QueryRowContext(ctx,
+		`
+			UPDATE allowed_allowances
+			SET max_amount = $2
+			WHERE allowance_type = $1
+			RETURNING allowance_type, max_amount
+	   	`, allowanceType, amount).Scan(&at, &am)
+	if err != nil {
+		return AllowedAllowance{}, err
+	}
+
+	return AllowedAllowance{
+		AllowanceType: at,
+		MaxAmount:     am,
+	}, nil
+}
+
 type DefaultAllowance struct {
 	AllowanceType string  `db:"allowance_type"`
 	Amount        float64 `db:"amount"`

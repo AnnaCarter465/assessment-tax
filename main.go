@@ -72,6 +72,7 @@ func main() {
 	}))
 
 	am.POST("/deductions/personal", handler.NewAdminHandler(vl, db).UpdatePesonal)
+	am.POST("/deductions/k-receipt", handler.NewAdminHandler(vl, db).UpdateKReceipt)
 
 	go func() {
 		if err := e.Start(":" + port); err != nil && err != http.ErrServerClosed {
