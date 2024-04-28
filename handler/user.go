@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"github.com/AnnaCarter465/assessment-tax/database"
 	"github.com/AnnaCarter465/assessment-tax/tax"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
@@ -13,7 +15,7 @@ type (
 	TaxRequest struct {
 		TotalIncome float64     `json:"totalIncome" validate:"required,number,gte=0"`
 		Wht         float64     `json:"wht" validate:"number,gte=0"`
-		Allowances  []Allowance `json:"allowances" validate:"required,dive,required"`
+		Allowances  []Allowance `json:"allowances" validate:"required,dive"`
 	}
 
 	Allowance struct {
@@ -33,12 +35,18 @@ type (
 	}
 )
 
-type TaxHandler struct {
-	db *database.DB
+type IDB interface {
+	FindAllDefaultAllowances(ctx context.Context) ([]database.DefaultAllowance, error)
+	FindAllAllowedAllowances(ctx context.Context) ([]database.AllowedAllowance, error)
 }
 
-func NewTaxHandler(db *database.DB) *TaxHandler {
-	return &TaxHandler{db}
+type TaxHandler struct {
+	vl *validator.Validate
+	db IDB
+}
+
+func NewTaxHandler(vl *validator.Validate, db IDB) *TaxHandler {
+	return &TaxHandler{vl, db}
 }
 
 func (t *TaxHandler) CalculateTax(c echo.Context) error {
@@ -50,8 +58,10 @@ func (t *TaxHandler) CalculateTax(c echo.Context) error {
 		})
 	}
 
-	if err := c.Validate(req); err != nil {
-		return err
+	if err := t.vl.Struct(req); err != nil {
+		return c.JSON(http.StatusBadRequest, ResponseMsg{
+			Message: "Bad request",
+		})
 	}
 
 	if req.TotalIncome < req.Wht {

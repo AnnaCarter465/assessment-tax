@@ -16,49 +16,26 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
-type (
-	TaxRequest struct {
-		TotalIncome float64     `json:"totalIncome" validate:"required,number,gte=0"`
-		Wht         float64     `json:"wht" validate:"number,gte=0"`
-		Allowances  []Allowance `json:"allowances" validate:"required,dive,required"`
-	}
+type TaxRequest struct {
+	TotalIncome float64     `json:"totalIncome" validate:"required,number,gte=0"`
+	Wht         float64     `json:"wht" validate:"number,gte=0"`
+	Allowances  []Allowance `json:"allowances" validate:"required,dive,required"`
+}
 
-	Allowance struct {
-		AllowanceType string  `json:"allowanceType" validate:"required,lowercase"`
-		Amount        float64 `json:"amount" validate:"number,gte=0"`
-	}
+type Allowance struct {
+	AllowanceType string  `json:"allowanceType" validate:"required,lowercase"`
+	Amount        float64 `json:"amount" validate:"number,gte=0"`
+}
 
-	TaxResponse struct {
-		Tax       float64    `json:"tax"`
-		TaxRefund float64    `json:"taxRefund"`
-		TaxLevel  []TaxLevel `json:"taxLevel"`
-	}
+type TaxResponse struct {
+	Tax       float64    `json:"tax"`
+	TaxRefund float64    `json:"taxRefund"`
+	TaxLevel  []TaxLevel `json:"taxLevel"`
+}
 
-	TaxLevel struct {
-		Level string  `json:"level"`
-		Tax   float64 `json:"tax"`
-	}
-
-	ResponseMsg struct {
-		Message string `json:"message"`
-	}
-
-	AdminTaxRequest struct {
-		Amount float64 `json:"amount" validate:"required,number,gte=0"`
-	}
-
-	CustomValidator struct {
-		validator *validator.Validate
-	}
-)
-
-func (cv *CustomValidator) Validate(i interface{}) error {
-	if err := cv.validator.Struct(i); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, ResponseMsg{
-			Message: err.Error(),
-		})
-	}
-	return nil
+type TaxLevel struct {
+	Level string  `json:"level"`
+	Tax   float64 `json:"tax"`
 }
 
 func main() {
@@ -74,11 +51,12 @@ func main() {
 		log.Fatal("Cannot connection to database", err)
 	}
 
+	vl := validator.New()
+
 	e := echo.New()
-	e.Validator = &CustomValidator{validator: validator.New()}
 
 	e.GET("/", handler.Healthcheck)
-	e.POST("/tax/calculations", handler.NewTaxHandler(db).CalculateTax)
+	e.POST("/tax/calculations", handler.NewTaxHandler(vl, db).CalculateTax)
 
 	// admin -----------------------------------------------------------------------------
 	am := e.Group("/admin")
@@ -89,7 +67,7 @@ func main() {
 		return false, nil
 	}))
 
-	am.POST("/deductions/personal", handler.NewAdminHandler(db).UpdatePesonal)
+	am.POST("/deductions/personal", handler.NewAdminHandler(vl, db).UpdatePesonal)
 
 	go func() {
 		if err := e.Start(":" + port); err != nil && err != http.ErrServerClosed {
@@ -106,7 +84,6 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		log.Fatal(e.Start(":8000"))
 		e.Logger.Fatal(err)
 	}
 }

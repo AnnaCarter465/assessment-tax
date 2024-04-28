@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"github.com/AnnaCarter465/assessment-tax/database"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
@@ -12,12 +14,17 @@ type AdminTaxRequest struct {
 	Amount float64 `json:"amount" validate:"required,number,gte=0"`
 }
 
-type AdminHandler struct {
-	db *database.DB
+type AdminIDB interface {
+	UpdateAmountDefaultAllowances(ctx context.Context, allowanceType string, amount float64) (database.DefaultAllowance, error)
 }
 
-func NewAdminHandler(db *database.DB) *AdminHandler {
-	return &AdminHandler{db}
+type AdminHandler struct {
+	vl *validator.Validate
+	db AdminIDB
+}
+
+func NewAdminHandler(vl *validator.Validate, db AdminIDB) *AdminHandler {
+	return &AdminHandler{vl, db}
 }
 
 func (a *AdminHandler) UpdatePesonal(c echo.Context) error {
@@ -25,17 +32,19 @@ func (a *AdminHandler) UpdatePesonal(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, ResponseMsg{
-			Message: "bad request",
+			Message: "Bad request",
 		})
 	}
 
-	if err := c.Validate(req); err != nil {
-		return err
+	if err := a.vl.Struct(req); err != nil {
+		return c.JSON(http.StatusBadRequest, ResponseMsg{
+			Message: "Bad request",
+		})
 	}
 
 	if req.Amount < 10_000 || req.Amount > 100_000 {
 		return c.JSON(http.StatusBadRequest, ResponseMsg{
-			Message: "invalid amount",
+			Message: "Invalid amount",
 		})
 	}
 

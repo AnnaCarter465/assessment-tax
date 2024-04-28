@@ -136,15 +136,15 @@ type TaxSummary struct {
 func (t *Tax) CalculateTaxSummary() TaxSummary {
 	netIncome := t.income - t.calculateTotalAllowance()
 
+	statements := t.calculateTaxStatement(netIncome)
+
 	if netIncome <= 0 {
 		return TaxSummary{
-			TaxStatements: nil,
+			TaxStatements: statements,
 			Tax:           0,
 			Refund:        t.wht,
 		}
 	}
-
-	statements := t.calculateTaxStatement(netIncome)
 
 	var tax float64
 
