@@ -173,6 +173,68 @@ func TestCalculateTax(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:              "netincome < 0",
+			allowedAllowances: Allowances{"donation": 100_000, "k-receipt": 50_000},
+			income:            110_000,
+			allowances:        Allowances{"donation": 100_000},
+			wht:               20_000,
+			expectedTax:       0,
+			expectedRefund:    20_000,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
+		},
+		{
+			name:              "tax < wht",
+			allowedAllowances: Allowances{"donation": 100_000, "k-receipt": 50_000},
+			income:            500_000,
+			allowances:        Allowances{"donation": 100_000},
+			wht:               60_000,
+			expectedTax:       0,
+			expectedRefund:    41_000,
+			expectStatements: []TaxStatement{
+				{
+					Rate: Rate{Percentage: 0, Max: 150_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.1, Max: 500_000},
+					Tax:  19_000,
+				},
+				{
+					Rate: Rate{Percentage: 0.15, Max: 1_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.2, Max: 2_000_000},
+					Tax:  0,
+				},
+				{
+					Rate: Rate{Percentage: 0.35, Max: -1},
+					Tax:  0,
+				},
+			},
+		},
 	}
 
 	t.Parallel()
