@@ -56,7 +56,11 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", handler.Healthcheck)
-	e.POST("/tax/calculations", handler.NewTaxHandler(vl, db).CalculateTax)
+
+	// user ------------------------------------------------------------------------------
+	u := e.Group("/tax")
+	u.POST("/calculations", handler.NewTaxHandler(vl, db).CalculateTax)
+	u.POST("/calculations/upload-csv", handler.NewTaxHandler(vl, db).CalculateTaxWithCSV)
 
 	// admin -----------------------------------------------------------------------------
 	am := e.Group("/admin")
