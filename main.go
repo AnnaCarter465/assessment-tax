@@ -28,8 +28,14 @@ type (
 	}
 
 	TaxResponse struct {
-		Tax       float64 `json:"tax"`
-		TaxRefund float64 `json:"taxRefund"`
+		Tax       float64    `json:"tax"`
+		TaxRefund float64    `json:"taxRefund"`
+		TaxLevel  []TaxLevel `json:"taxLevel"`
+	}
+
+	TaxLevel struct {
+		Level string  `json:"level"`
+		Tax   float64 `json:"tax"`
 	}
 
 	CustomValidator struct {
@@ -103,14 +109,16 @@ func main() {
 			allowedAllowancesMap[allowedAllowance.AllowanceType] = allowedAllowance.MaxAmount
 		}
 
+		rates := []tax.Rate{
+			{Percentage: 0, Max: 150_000, Label: "0-150,000"},
+			{Percentage: 0.1, Max: 500_000, Label: "150,001-500,000"},
+			{Percentage: 0.15, Max: 1_000_000, Label: "500,001-1,000,000"},
+			{Percentage: 0.2, Max: 2_000_000, Label: "1,000,001-2,000,000"},
+			{Percentage: 0.35, Max: -1, Label: "2,000,001 ขึ้นไป"},
+		}
+
 		tx := tax.NewTax(tax.TaxConfig{
-			Rates: []tax.Rate{
-				{Percentage: 0, Max: 150_000},
-				{Percentage: 0.1, Max: 500_000},
-				{Percentage: 0.15, Max: 1_000_000},
-				{Percentage: 0.2, Max: 2_000_000},
-				{Percentage: 0.35, Max: -1},
-			},
+			Rates:             rates,
 			DefaultAllowances: defaultAllowancesMap,
 			AllowedAllowances: allowedAllowancesMap,
 		}).SetIncome(req.TotalIncome).SetWht(req.Wht)
@@ -119,10 +127,21 @@ func main() {
 			tx.AddAllowance(a.AllowanceType, a.Amount)
 		}
 
-		pay, refund := tx.CalculateTax()
+		summary := tx.CalculateTaxSummary()
+
+		var levels []TaxLevel
+
+		for _, l := range summary.TaxStatements {
+			levels = append(levels, TaxLevel{
+				Level: l.Rate.Label,
+				Tax:   l.Tax,
+			})
+		}
+
 		return c.JSON(http.StatusOK, &TaxResponse{
-			Tax:       pay,
-			TaxRefund: refund,
+			Tax:       summary.Tax,
+			TaxRefund: summary.Refund,
+			TaxLevel:  levels,
 		})
 	})
 
