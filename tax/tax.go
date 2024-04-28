@@ -16,6 +16,7 @@ type Tax struct {
 	income     float64
 	allowances Allowances
 	taxConf    TaxConfig
+	wht        float64
 }
 
 func NewTax(taxConf TaxConfig) *Tax {
@@ -27,6 +28,11 @@ func NewTax(taxConf TaxConfig) *Tax {
 
 func (t *Tax) SetIncome(income float64) *Tax {
 	t.income = income
+	return t
+}
+
+func (t *Tax) SetWht(wht float64) *Tax {
+	t.wht = wht
 	return t
 }
 
@@ -69,11 +75,11 @@ func (t *Tax) calculateTotalAllowance() float64 {
 	return totalAllowance
 }
 
-func (t *Tax) CalculateTax() float64 {
+func (t *Tax) CalculateTax() (float64, float64) {
 	netIncome := t.income - t.calculateTotalAllowance()
 
 	if netIncome <= 0 {
-		return 0
+		return 0, t.wht
 	}
 
 	var tax float64
@@ -100,5 +106,9 @@ func (t *Tax) CalculateTax() float64 {
 		remain -= rate.Max
 	}
 
-	return tax
+	// no need to pay tax, and get refund
+	if tax <= t.wht {
+		return 0, t.wht - tax
+	}
+	return tax - t.wht, 0
 }

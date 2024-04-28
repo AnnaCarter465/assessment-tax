@@ -12,6 +12,7 @@ func TestCalculateTax2(t *testing.T) {
 		allowances        Allowances
 		wht               float64
 		expectedTax       float64
+		expectedRefund    float64
 	}
 
 	tcs := []TC{
@@ -22,6 +23,7 @@ func TestCalculateTax2(t *testing.T) {
 			allowances:        Allowances{"donation": 0},
 			wht:               0,
 			expectedTax:       29_000,
+			expectedRefund:    0,
 		},
 		{
 			name:              "allowances from user that not in allowed allowances are not calculate",
@@ -30,6 +32,7 @@ func TestCalculateTax2(t *testing.T) {
 			allowances:        Allowances{"something": 1000},
 			wht:               0,
 			expectedTax:       29_000,
+			expectedRefund:    0,
 		},
 		{
 			name:              "allowances from user that in default allowances are not calculate again",
@@ -38,6 +41,16 @@ func TestCalculateTax2(t *testing.T) {
 			allowances:        Allowances{"personal": 100_000},
 			wht:               0,
 			expectedTax:       29_000,
+			expectedRefund:    0,
+		},
+		{
+			name:              "income 500,000 and wht 25,000", // exp02
+			allowedAllowances: Allowances{"donation": 100_000, "k-receipt": 50_000},
+			income:            500_000,
+			allowances:        Allowances{"donation": 0},
+			wht:               25_000,
+			expectedTax:       4000,
+			expectedRefund:    0,
 		},
 	}
 
@@ -60,15 +73,20 @@ func TestCalculateTax2(t *testing.T) {
 			)
 
 			taxer.SetIncome(tc.income)
+			taxer.SetWht(tc.wht)
 
 			for allowanceType, allowanceAmount := range tc.allowances {
 				taxer.AddAllowance(allowanceType, allowanceAmount)
 			}
 
-			got := taxer.CalculateTax()
+			gotPay, gotRefund := taxer.CalculateTax()
 
-			if got != tc.expectedTax {
-				t.Errorf("Wrong result expected %v, but got %v", tc.expectedTax, got)
+			if gotPay != tc.expectedTax {
+				t.Errorf("Wrong tax expected %v, but got %v", tc.expectedTax, gotPay)
+			}
+
+			if gotRefund != tc.expectedRefund {
+				t.Errorf("Wrong refund expected %v, but got %v", tc.expectedRefund, gotRefund)
 			}
 		})
 	}
