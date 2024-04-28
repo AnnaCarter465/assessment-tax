@@ -52,6 +52,15 @@ func TestCalculateTax2(t *testing.T) {
 			expectedTax:       4000,
 			expectedRefund:    0,
 		},
+		{
+			name:              "income 500,000 and donation 200,000", // exp03
+			allowedAllowances: Allowances{"donation": 100_000, "k-receipt": 50_000},
+			income:            500_000,
+			allowances:        Allowances{"donation": 200_000},
+			wht:               0,
+			expectedTax:       19_000,
+			expectedRefund:    0,
+		},
 	}
 
 	t.Parallel()
