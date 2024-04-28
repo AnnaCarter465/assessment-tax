@@ -11,11 +11,12 @@ import (
 )
 
 type AdminTaxRequest struct {
-	Amount float64 `json:"amount" validate:"required,number,gte=0"`
+	Amount float64 `json:"amount" validate:"required,number,gt=0"`
 }
 
 type AdminIDB interface {
 	UpdateAmountDefaultAllowances(ctx context.Context, allowanceType string, amount float64) (database.DefaultAllowance, error)
+	UpdateAmountAllowedAllowances(ctx context.Context, allowanceType string, amount float64) (database.AllowedAllowance, error)
 }
 
 type AdminHandler struct {
@@ -58,5 +59,39 @@ func (a *AdminHandler) UpdatePesonal(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]float64{
 		"personalDeduction": defaultAllowance.Amount,
+	})
+}
+
+func (a *AdminHandler) UpdateKReceipt(c echo.Context) error {
+	var req AdminTaxRequest
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ResponseMsg{
+			Message: "Bad request",
+		})
+	}
+
+	if err := a.vl.Struct(req); err != nil {
+		return c.JSON(http.StatusBadRequest, ResponseMsg{
+			Message: "Bad request",
+		})
+	}
+
+	if req.Amount > 100_000 {
+		return c.JSON(http.StatusBadRequest, ResponseMsg{
+			Message: "Invalid amount",
+		})
+	}
+
+	allowance, err := a.db.UpdateAmountAllowedAllowances(c.Request().Context(), "k-receipt", req.Amount)
+	if err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusInternalServerError, ResponseMsg{
+			Message: "Failed to update k-receipt amount",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]float64{
+		"kReceipt": allowance.MaxAmount,
 	})
 }

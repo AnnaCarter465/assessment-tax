@@ -28,6 +28,11 @@ func (o *AdminDBMock) UpdateAmountDefaultAllowances(ctx context.Context, allowan
 	return args.Get(0).(database.DefaultAllowance), args.Error(1)
 }
 
+func (o *AdminDBMock) UpdateAmountAllowedAllowances(ctx context.Context, allowanceType string, amount float64) (database.AllowedAllowance, error) {
+	args := o.Called(ctx, allowanceType, amount)
+	return args.Get(0).(database.AllowedAllowance), args.Error(1)
+}
+
 type MockSetting struct {
 	Args    []interface{}
 	Returns []interface{}
@@ -144,6 +149,143 @@ func TestAdminUpdatePesonal(t *testing.T) {
 			e := echo.New()
 
 			goterr := h.UpdatePesonal(e.NewContext(req, rec))
+
+			assert.NoError(t, goterr)
+
+			if tc.errresp != nil {
+				var errresp ResponseMsg
+
+				err := json.Unmarshal([]byte(rec.Body.String()), &errresp)
+				assert.NoError(t, err)
+
+				assert.NotEqual(t, http.StatusOK, rec.Code)
+
+				equal := reflect.DeepEqual(*tc.errresp, errresp)
+
+				if !equal {
+					assert.Fail(t, fmt.Sprintf("expected %v, \nbut got %v", *tc.errresp, errresp))
+				}
+
+				return
+			}
+
+			var got map[string]float64
+
+			err := json.Unmarshal([]byte(rec.Body.String()), &got)
+			assert.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+
+			equal := reflect.DeepEqual(tc.want, got)
+
+			if !equal {
+				assert.Fail(t, fmt.Sprintf("expected %v, \nbut got %v", tc.want, got))
+			}
+		})
+	}
+}
+
+func TestAdminUpdateKReciept(t *testing.T) {
+	type TC struct {
+		reqbody                           map[string]interface{}
+		want                              map[string]float64
+		mockUpdateAmountAllowedAllowances *MockSetting
+		errresp                           *ResponseMsg
+	}
+
+	tcs := []TC{
+		{
+			reqbody: map[string]interface{}{
+				"amount": 70_000,
+			},
+			mockUpdateAmountAllowedAllowances: &MockSetting{
+				Args: []interface{}{
+					mock.Anything,
+					"k-receipt",
+					float64(70_000),
+				},
+				Returns: []interface{}{
+					database.AllowedAllowance{AllowanceType: "k-receipt", MaxAmount: 70_000},
+					nil,
+				},
+			},
+			want: map[string]float64{
+				"kReceipt": 70_000,
+			},
+			errresp: nil,
+		},
+		{
+			reqbody: map[string]interface{}{
+				"amount": "wrong_amount",
+			},
+			mockUpdateAmountAllowedAllowances: nil,
+			want:                              nil,
+			errresp: &ResponseMsg{
+				Message: "Bad request",
+			},
+		},
+		{
+			reqbody:                           nil,
+			mockUpdateAmountAllowedAllowances: nil,
+			want:                              nil,
+			errresp: &ResponseMsg{
+				Message: "Bad request",
+			},
+		},
+		{
+			reqbody: map[string]interface{}{
+				"amount": 100_001,
+			},
+			mockUpdateAmountAllowedAllowances: nil,
+			want:                              nil,
+			errresp: &ResponseMsg{
+				Message: "Invalid amount",
+			},
+		},
+		{
+			reqbody: map[string]interface{}{
+				"amount": 70_000,
+			},
+			mockUpdateAmountAllowedAllowances: &MockSetting{
+				Args: []interface{}{
+					mock.Anything,
+					"k-receipt",
+					float64(70_000),
+				},
+				Returns: []interface{}{
+					database.AllowedAllowance{},
+					errors.New("an error"),
+				},
+			},
+			want: nil,
+			errresp: &ResponseMsg{
+				Message: "Failed to update k-receipt amount",
+			},
+		},
+	}
+
+	for i, tc := range tcs {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			dbmock := new(AdminDBMock)
+
+			if tc.mockUpdateAmountAllowedAllowances != nil {
+				dbmock.On(
+					"UpdateAmountAllowedAllowances",
+					tc.mockUpdateAmountAllowedAllowances.Args...,
+				).Return(tc.mockUpdateAmountAllowedAllowances.Returns...)
+			}
+
+			h := NewAdminHandler(validator.New(), dbmock)
+
+			val, _ := json.Marshal(tc.reqbody)
+
+			req := httptest.NewRequest(http.MethodPost, "/admin/deductions/k-receipt", strings.NewReader(string(val)))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+
+			e := echo.New()
+
+			goterr := h.UpdateKReceipt(e.NewContext(req, rec))
 
 			assert.NoError(t, goterr)
 

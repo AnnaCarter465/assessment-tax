@@ -13,16 +13,16 @@ services:
     volumes:
     - ./initialdata:/docker-entrypoint-initdb.d
 
-  # example 
-  ktaxes:
-    container_name: ktaxes-app
-    build: .
-    ports:
-      - '8080:8080'
-    depends_on:
-      - ktaxes-db
-    environment:
-      # WARN: this is a secret value, shouldn't expose to public. But this is just an assginment for give you an example!
-      DATABASE_URL: postgres://postgres:postgres@ktaxes-db:5432/ktaxes?sslmode=disable
-      PORT: 8080
+  # # example 
+  # ktaxes:
+  #   container_name: ktaxes-app
+  #   build: .
+  #   ports:
+  #     - '8080:8080'
+  #   depends_on:
+  #     - ktaxes-db
+  #   environment:
+  #     # WARN: this is a secret value, shouldn't expose to public. But this is just an assginment for give you an example!
+  #     DATABASE_URL: postgres://postgres:postgres@ktaxes-db:5432/ktaxes?sslmode=disable
+  #     PORT: 8080
 
