@@ -197,6 +197,66 @@ func TestUserCalculateTax(t *testing.T) {
 				Message: "Internal server error",
 			},
 		},
+		{
+			reqbody: map[string]interface{}{ // exp07
+				"totalIncome": float64(500_000),
+				"wht":         float64(0),
+				"allowances": []Allowance{
+					{AllowanceType: "k-receipt", Amount: 200_000},
+					{AllowanceType: "donation", Amount: 100_000},
+				},
+			},
+			want: &TaxResponse{
+				Tax:       14_000,
+				TaxRefund: 0,
+				TaxLevel: []TaxLevel{
+					{
+						Level: "0-150,000",
+						Tax:   0,
+					},
+					{
+						Level: "150,001-500,000",
+						Tax:   14_000,
+					},
+					{
+						Level: "500,001-1,000,000",
+						Tax:   0,
+					},
+					{
+						Level: "1,000,001-2,000,000",
+						Tax:   0,
+					},
+					{
+						Level: "2,000,001 ขึ้นไป",
+						Tax:   0,
+					},
+				},
+			},
+			mockFindAllDefaultAllowances: &MockSetting{
+				Args: []interface{}{
+					mock.Anything,
+				},
+				Returns: []interface{}{
+					[]database.DefaultAllowance{
+						{AllowanceType: "personal", Amount: 60_000},
+					},
+					nil,
+				},
+			},
+			mockFindAllAllowedAllowances: &MockSetting{
+				Args: []interface{}{
+					mock.Anything,
+				},
+				Returns: []interface{}{
+					[]database.AllowedAllowance{
+						{AllowanceType: "donation", MaxAmount: 100_000},
+						{AllowanceType: "k-receipt", MaxAmount: 50_000},
+					},
+					nil,
+				},
+			},
+			errresp: nil,
+		},
 	}
 
 	for i, tc := range tcs {
