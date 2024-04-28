@@ -17,7 +17,7 @@ func NewDB(dbURL string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return &DB{sqlDB: db}, nil
 }
 
 func (db *DB) GetSQLDB() *sql.DB {
